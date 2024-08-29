@@ -209,7 +209,6 @@ jobs:
           CONFIG_PKG_FORTIFY_SOURCE_2=y
           # CONFIG_WOLFSSL_HAS_ECC25519 is not set
           CONFIG_ZRAM_DEF_COMP_LZORLE=y
-
           EOF
 
           #
