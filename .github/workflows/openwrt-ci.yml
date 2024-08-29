@@ -1,58 +1,229 @@
+#
+# This is free software, lisence use MIT.
+# 
+# Copyright (C) 2019 P3TERX <https://p3terx.com>
+# Copyright (C) 2020 KFERMercer <KFER.Mercer@gmail.com>
 # 
 # <https://github.com/KFERMercer/OpenWrt-CI>
 #
-# Copyright (C) 2019 P3TERX
-#
-# Copyright (C) 2020 KFERMercer
-#
+
 name: OpenWrt-CI
 
 on:
-  schedule:
-    - cron: 0 20 * * *
-
-permissions:
-  contents: read
+  push:
+    branches: 
+      - master
+  # schedule:
+  #   - cron: 0 20 * * *
+  release:
+    types: [published]
 
 jobs:
 
   build_openwrt:
 
-    name: Build OpenWrt Firmware
+    name: Build OpenWrt firmware
 
     runs-on: ubuntu-latest
 
+    if: github.event.repository.owner.id == github.event.sender.id
+
     steps:
-      - name: Space cleanup and Initialization environment
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          ref: master
+
+      - name: Space cleanup
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
           docker rmi `docker images -q`
-          sudo -E rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d /usr/local/lib/android
-          sudo -E apt-mark hold grub-efi-amd64-signed
-          sudo -E apt update
-          sudo -E apt -y purge azure-cli* docker* ghc* zulu* llvm* firefox google* dotnet* powershell* openjdk* mysql* php* mongodb* dotnet* snap*
-          sudo -E apt -y full-upgrade
-          sudo -E apt -y install ack antlr3 aria2 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp nano ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip libpython3-dev qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
-          sudo -E systemctl daemon-reload
-          sudo -E apt -y autoremove --purge
-          sudo -E apt clean
-          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          sudo rm -rf /usr/share/dotnet /etc/mysql /etc/php /etc/apt/sources.list.d /usr/local/lib/android
+          sudo -E apt-get -y purge azure-cli ghc* zulu* hhvm llvm* firefox google* dotnet* powershell openjdk* adoptopenjdk* mysql* php* mongodb* dotnet* moby* snapd* || true
+          sudo -E apt-get update
+          sudo -E apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git libncurses5-dev libz-dev patch python3 unzip zlib1g-dev lib32gcc1 libc6-dev-i386 subversion flex uglifyjs gcc-multilib g++-multilib p7zip p7zip-full msmtp libssl-dev texinfo libglib2.0-dev xmlto qemu-utils upx libelf-dev autoconf automake libtool autopoint device-tree-compiler antlr3 gperf swig libtinfo5
+          sudo -E apt-get -y autoremove --purge
+          sudo -E apt-get clean
 
-      - name: Checkout OpenWrt
-        uses: actions/checkout@v3
+          # sudo mkdir -p -m 777 /mnt/openwrt/bin /mnt/openwrt/build_dir/host /mnt/openwrt/build_dir/hostpkg /mnt/openwrt/dl /mnt/openwrt/feeds /mnt/openwrt/staging_dir
+          # ln -s /mnt/openwrt/bin ./bin
+          # mkdir -p ./build_dir
+          # ln -s -f /mnt/openwrt/build_dir/host ./build_dir/host
+          # ln -s -f /mnt/openwrt/build_dir/hostpkg ./build_dir/hostpkg
+          # ln -s /mnt/openwrt/dl ./dl
+          # ln -s /mnt/openwrt/feeds ./feeds
+          # ln -s /mnt/openwrt/staging_dir ./staging_dir
+
+          df -h
 
       - name: Update feeds
         run: |
-          sed -i 's/#src-git helloworld/src-git helloworld/g' ./feeds.conf.default
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
       - name: Generate configuration file
-        run: make defconfig
+        run: |
+          rm -f ./.config*
+          touch ./.config
 
-      - name: Download packages
-        run: make download -j16
+          #
+          # 在 cat >> .config <<EOF 到 EOF 之间粘贴你的编译配置, 需注意缩进关系
+          # 例如:
+
+          cat >> .config <<EOF
+          CONFIG_TARGET_mediatek=y
+          CONFIG_TARGET_mediatek_filogic=y
+          CONFIG_TARGET_mediatek_filogic_DEVICE_qihoo_360t7=y
+          CONFIG_DEVEL=y
+          CONFIG_TOOLCHAINOPTS=y
+          CONFIG_BUSYBOX_CUSTOM=y
+          CONFIG_AFALG_UPDATE_CTR_IV=y
+          CONFIG_BUSYBOX_CONFIG_BLKID=y
+          CONFIG_BUSYBOX_CONFIG_FEATURE_BLKID_TYPE=y
+          CONFIG_BUSYBOX_CONFIG_VOLUMEID=y
+          # CONFIG_GDB is not set
+          CONFIG_INCLUDE_CONFIG=y
+          # CONFIG_KERNEL_BLK_DEV_THROTTLING is not set
+          # CONFIG_KERNEL_CFS_BANDWIDTH is not set
+          CONFIG_KERNEL_CGROUP_DEVICE=y
+          CONFIG_KERNEL_CGROUP_FREEZER=y
+          CONFIG_KERNEL_DEVMEM=y
+          # CONFIG_KERNEL_KEYS is not set
+          # CONFIG_KERNEL_MEMCG_SWAP is not set
+          CONFIG_KERNEL_NET_CLS_CGROUP=y
+          CONFIG_LIBSODIUM_MINIMAL=y
+          # CONFIG_OPENSSL_ENGINE_BUILTIN is not set
+          CONFIG_OPENSSL_WITH_NPN=y
+          CONFIG_PACKAGE_6in4=y
+          CONFIG_PACKAGE_bash=y
+          CONFIG_PACKAGE_blockd=y
+          CONFIG_PACKAGE_blockdev=m
+          CONFIG_PACKAGE_coreutils=y
+          CONFIG_PACKAGE_coreutils-base64=y
+          CONFIG_PACKAGE_iptables-mod-tee=y
+          CONFIG_PACKAGE_iptables-mod-u32=y
+          CONFIG_PACKAGE_ipv6helper=y
+          CONFIG_PACKAGE_kmod-ata-core=y
+          CONFIG_PACKAGE_kmod-crypto-acompress=y
+          CONFIG_PACKAGE_kmod-crypto-crc32c=y
+          CONFIG_PACKAGE_kmod-crypto-md4=y
+          CONFIG_PACKAGE_kmod-ebtables=y
+          CONFIG_PACKAGE_kmod-ebtables-ipv4=y
+          CONFIG_PACKAGE_kmod-ebtables-ipv6=y
+          CONFIG_PACKAGE_kmod-fs-autofs4=y
+          CONFIG_PACKAGE_kmod-fs-vfat=y
+          CONFIG_PACKAGE_kmod-ifb=y
+          CONFIG_PACKAGE_kmod-inet-diag=y
+          CONFIG_PACKAGE_kmod-ip6tables=y
+          CONFIG_PACKAGE_kmod-ip6tables-extra=y
+          CONFIG_PACKAGE_kmod-ipt-compat-xtables=y
+          CONFIG_PACKAGE_kmod-ipt-filter=y
+          CONFIG_PACKAGE_kmod-ipt-hashlimit=y
+          CONFIG_PACKAGE_kmod-ipt-iface=y
+          CONFIG_PACKAGE_kmod-ipt-ipmark=y
+          CONFIG_PACKAGE_kmod-ipt-ipopt=y
+          CONFIG_PACKAGE_kmod-ipt-iprange=y
+          CONFIG_PACKAGE_kmod-ipt-ipv4options=y
+          CONFIG_PACKAGE_kmod-ipt-nat-extra=y
+          CONFIG_PACKAGE_kmod-ipt-nat6=y
+          CONFIG_PACKAGE_kmod-ipt-proto=y
+          CONFIG_PACKAGE_kmod-ipt-raw6=y
+          CONFIG_PACKAGE_kmod-ipt-tee=y
+          CONFIG_PACKAGE_kmod-ipt-u32=y
+          CONFIG_PACKAGE_kmod-iptunnel=y
+          CONFIG_PACKAGE_kmod-iptunnel4=y
+          CONFIG_PACKAGE_kmod-lib-crc32c=y
+          CONFIG_PACKAGE_kmod-lib-lzo=y
+          CONFIG_PACKAGE_kmod-nf-ipt6=y
+          CONFIG_PACKAGE_kmod-nf-log6=y
+          CONFIG_PACKAGE_kmod-nf-nat6=y
+          CONFIG_PACKAGE_kmod-nf-reject6=y
+          CONFIG_PACKAGE_kmod-nls-base=y
+          CONFIG_PACKAGE_kmod-nls-cp437=y
+          CONFIG_PACKAGE_kmod-nls-iso8859-1=y
+          CONFIG_PACKAGE_kmod-nls-utf8=y
+          CONFIG_PACKAGE_kmod-sched-core=y
+          CONFIG_PACKAGE_kmod-scsi-core=y
+          CONFIG_PACKAGE_kmod-sit=y
+          CONFIG_PACKAGE_kmod-zram=y
+          CONFIG_PACKAGE_libatomic=y
+          CONFIG_PACKAGE_libblkid=y
+          CONFIG_PACKAGE_libcap=y
+          CONFIG_PACKAGE_libcap-ng=y
+          CONFIG_PACKAGE_libcbor=y
+          CONFIG_PACKAGE_libev=y
+          CONFIG_PACKAGE_libevdev=y
+          CONFIG_PACKAGE_libevent2=y
+          CONFIG_PACKAGE_libf2fs=m
+          CONFIG_PACKAGE_libfido2=y
+          CONFIG_PACKAGE_libldns=y
+          CONFIG_PACKAGE_libnl=y
+          CONFIG_PACKAGE_libnl-core=y
+          CONFIG_PACKAGE_libnl-genl=y
+          CONFIG_PACKAGE_libnl-nf=y
+          CONFIG_PACKAGE_libnl-route=y
+          CONFIG_PACKAGE_libopenssl-afalg_sync=y
+          CONFIG_PACKAGE_libopenssl-devcrypto=y
+          CONFIG_PACKAGE_libpcap=y
+          CONFIG_PACKAGE_libreadline=y
+          CONFIG_PACKAGE_libsmartcols=m
+          CONFIG_PACKAGE_libsodium=y
+          CONFIG_PACKAGE_libstdcpp=y
+          CONFIG_PACKAGE_libudev-zero=y
+          CONFIG_PACKAGE_libudns=y
+          CONFIG_PACKAGE_libuv=y
+          CONFIG_PACKAGE_libwebsockets-full=y
+          CONFIG_PACKAGE_lua-cjson=y
+          CONFIG_PACKAGE_luci-app-frpc=y
+          CONFIG_PACKAGE_luci-app-netdata=y
+          # CONFIG_PACKAGE_luci-app-rclone_INCLUDE_rclone-ng is not set
+          # CONFIG_PACKAGE_luci-app-rclone_INCLUDE_rclone-webui is not set
+          CONFIG_PACKAGE_luci-app-ttyd=y
+          CONFIG_PACKAGE_luci-app-v2ray-server=y
+          CONFIG_PACKAGE_luci-app-watchcat=y
+          CONFIG_PACKAGE_luci-i18n-frpc-zh-cn=y
+          CONFIG_PACKAGE_luci-i18n-netdata-zh-cn=y
+          CONFIG_PACKAGE_luci-i18n-ttyd-zh-cn=y
+          CONFIG_PACKAGE_luci-i18n-v2ray-server-zh-cn=y
+          CONFIG_PACKAGE_luci-i18n-watchcat-zh-cn=y
+          CONFIG_PACKAGE_luci-theme-argon=y
+          CONFIG_PACKAGE_mkf2fs=m
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_netdata=y
+          CONFIG_PACKAGE_openssh-keygen=y
+          CONFIG_PACKAGE_openssh-sftp-server=y
+          CONFIG_PACKAGE_resolveip=y
+          CONFIG_PACKAGE_swconfig=y
+          CONFIG_PACKAGE_tc-mod-iptables=y
+          CONFIG_PACKAGE_tc-tiny=y
+          CONFIG_PACKAGE_tcpdump=y
+          CONFIG_PACKAGE_ttyd=y
+          CONFIG_PACKAGE_unzip=y
+          CONFIG_PACKAGE_watchcat=y
+          CONFIG_PACKAGE_wireless-tools=y
+          CONFIG_PACKAGE_zram-swap=y
+          # CONFIG_PKG_CHECK_FORMAT_SECURITY is not set
+          # CONFIG_PKG_FORTIFY_SOURCE_1 is not set
+          CONFIG_PKG_FORTIFY_SOURCE_2=y
+          # CONFIG_WOLFSSL_HAS_ECC25519 is not set
+          CONFIG_ZRAM_DEF_COMP_LZORLE=y
+
+          EOF
+
+          #
+          # ===============================================================
+          # 
+
+          sed -i 's/^[ \t]*//g' ./.config
+          make defconfig
+
+      - name: Make download
+        run: |
+          make download -j8 || make download -j1 V=s
+          rm -rf $(find ./dl/ -size -1024c)
+          df -h
 
       - name: Compile firmware
         run: |
@@ -62,32 +233,42 @@ jobs:
           echo "======================="
           df -h
           echo "======================="
-          du -h --max-depth=1 ./ --exclude=build_dir --exclude=bin
-          du -h --max-depth=1 ./build_dir
-          du -h --max-depth=1 ./bin
+          du -h ./ --max-depth=1
+          du -h /mnt/openwrt/ --max-depth=1 || true
 
       - name: Prepare artifact
         run: |
+          mkdir -p ./artifact/firmware
           mkdir -p ./artifact/package
           mkdir -p ./artifact/buildinfo
           rm -rf $(find ./bin/targets/ -type d -name "packages")
+          cp -rf $(find ./bin/targets/ -type f) ./artifact/firmware/
           cp -rf $(find ./bin/packages/ -type f -name "*.ipk") ./artifact/package/
           cp -rf $(find ./bin/targets/ -type f -name "*.buildinfo" -o -name "*.manifest") ./artifact/buildinfo/
 
-      - name: Upload buildinfo
-        uses: actions/upload-artifact@v3
+      - name: Deliver buildinfo
+        uses: actions/upload-artifact@v2
         with:
           name: OpenWrt_buildinfo
           path: ./artifact/buildinfo/
 
-      - name: Upload package
-        uses: actions/upload-artifact@v3
+      - name: Deliver package
+        uses: actions/upload-artifact@v2
         with:
           name: OpenWrt_package
           path: ./artifact/package/
 
-      - name: Upload firmware
-        uses: actions/upload-artifact@v3
+      - name: Deliver firmware
+        uses: actions/upload-artifact@v2
         with:
           name: OpenWrt_firmware
           path: ./bin/targets/
+
+      - name: Upload release asset
+        if: github.event == 'release'
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.YOURTOKEN }}
+          file: ./artifact/firmware/*
+          tag: ${{ github.ref }}
+          file_glob: true
